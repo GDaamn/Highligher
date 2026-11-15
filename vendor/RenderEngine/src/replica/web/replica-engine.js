@@ -317,12 +317,14 @@ export class ReplicaEngine extends EventTarget {
   renderPage(data = this.pageData, view = null) {
     const page = view?.page || this.page;
     const layout = view?.layout || this.layout;
+    const mode = data.mode || this.manifest.mode;
+    page.classList.toggle("replica-scan-page", mode === "scan");
     page.replaceChildren();
     page.classList.toggle("replica-source-visible", this.sourceVisible);
     page.classList.toggle("replica-exact-fit", this.exactFit);
     Object.assign(page.style, { width: `${data.width}px`, height: `${data.height}px` });
 
-    const scanSourcePath = scanSourceRelativePath(this.manifest, data);
+    const scanSourcePath = scanSourceRelativePath({ ...this.manifest, mode }, data);
     const scanSource = scanSourcePath ? this.url(scanSourcePath) : null;
     if (this.manifest.sourcePreview) {
       const source = this.document.createElement("img");
@@ -337,26 +339,27 @@ export class ReplicaEngine extends EventTarget {
     for (const image of data.images || []) {
       const node = this.document.createElement("img");
       node.className = "replica-page-image";
-      const isSource = this.manifest.mode === "scan" && isEmbeddedScanSource(image, data);
+      const isSource = mode === "scan" && isEmbeddedScanSource(image, data);
       node.classList.toggle("replica-embedded-source-page", isSource);
       node.src = this.url(image.src);
       Object.assign(node.style, { left: `${image.x}px`, top: `${image.y}px`, width: `${image.width}px`, height: `${image.height}px` });
       layer.append(node);
     }
     if (data.lines?.length) layer.append(this.renderRules(data));
-    const scan = this.manifest.mode === "scan" ? analyzeScanPage(data.words, data) : null;
+    const scan = mode === "scan" ? analyzeScanPage(data.words, data) : null;
     if (scanSource) {
       for (const region of scan.artworkRegions) layer.append(this.renderScanRegion(scanSource, data, region, "artwork"));
       for (const region of scan.typographyRegions) layer.append(this.renderScanRegion(scanSource, data, region, "typography"));
     }
     for (const word of data.words) {
       const box = this.renderWord(word, scan?.lineAssignments.get(word.id) ?? word.id, view);
+      if (word.angle) box.style.transform = `rotate(${word.angle}rad)`;
       box.classList.toggle("replica-source-typography-word", scan?.sourceWordIds.has(word.id) || false);
       layer.append(box);
     }
     page.append(layer);
     const schedule = this.document.defaultView.requestAnimationFrame || (callback => callback());
-    schedule(() => layout.apply({ mode: this.manifest.mode, sourceVisible: this.sourceVisible, line: null }));
+    schedule(() => layout.apply({ mode, sourceVisible: this.sourceVisible, line: null }));
     this.applyZoom(view);
   }
 
@@ -401,7 +404,7 @@ export class ReplicaEngine extends EventTarget {
     const pages = this.continuous ? [...this.pageViews.values()].filter(view => view.page) : [{ page: this.page, layout: this.layout }];
     for (const view of pages) {
       view.page.classList.toggle("replica-source-visible", this.sourceVisible);
-      if (render) view.layout.apply({ mode: this.manifest.mode, sourceVisible: this.sourceVisible, line: null });
+      if (render) view.layout.apply({ mode: view.data?.mode || this.manifest.mode, sourceVisible: this.sourceVisible, line: null });
     }
     this.emit("sourcechange", { visible: this.sourceVisible });
   }
