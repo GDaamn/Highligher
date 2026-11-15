@@ -70,3 +70,19 @@ def local_layers(pages):
         for index in sorted(local_ranking(group)):
             add_sentence(result, group[index])
     return result
+
+
+def page_summary_word_ids(page, proposed=None):
+    """Return ordered IDs for at least one complete summary sentence on a page."""
+    ordered_ids = [int(word["id"]) for word in page["words"]]
+    valid_ids = set(ordered_ids)
+    proposed = proposed or {}
+    selected = {
+        int(word_id)
+        for word_id in proposed.get("essential", [])
+        if int(word_id) in valid_ids
+    }
+    if not selected:
+        fallback = local_layers([page]).get(page["page"], {})
+        selected.update(int(word_id) for word_id in fallback.get("essential", []))
+    return [word_id for word_id in ordered_ids if word_id in selected]

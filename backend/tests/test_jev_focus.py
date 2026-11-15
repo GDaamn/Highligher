@@ -30,6 +30,38 @@ async def test_jev_keeps_the_entire_sentence_across_pages():
 
 
 @pytest.mark.asyncio
+async def test_jev_keeps_the_best_summary_sentence_when_all_scores_are_low():
+    client = JevFocusClient("test", "typesafe/jev-1.14")
+    await client.http.aclose()
+
+    def answer(request):
+        body = json.loads(request.content)
+        assert body["state"] == {
+            "s0": "A minor detail appears.",
+            "s1": "The central claim explains the page.",
+        }
+        return httpx.Response(200, json={
+            "answers": {"s0": {"noul": .2}, "s1": {"noul": .6}},
+        })
+
+    client.http = httpx.AsyncClient(transport=httpx.MockTransport(answer))
+    page = {
+        "page": 8,
+        "words": [
+            {"id": index, "text": word}
+            for index, word in enumerate(
+                "A minor detail appears. The central claim explains the page.".split()
+            )
+        ],
+    }
+    try:
+        result = await client.select([page])
+        assert result[8]["essential"] == [4, 5, 6, 7, 8, 9]
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
 async def test_reader_key_applies_to_existing_page_without_changing_saved_focus(tmp_path, monkeypatch):
     from backend.app import main
     from backend.app.models import DocumentRecord
@@ -67,6 +99,42 @@ async def test_reader_key_applies_to_existing_page_without_changing_saved_focus(
         assert len(calls) == 1
         assert "sample" not in result.text
         assert json.loads(path.read_text()) == saved
+
+
+@pytest.mark.asyncio
+async def test_reader_key_falls_back_to_a_page_summary_when_jev_selects_nothing(tmp_path, monkeypatch):
+    from backend.app import main
+    from backend.app.models import DocumentRecord
+    from backend.app.store import DocumentStore
+
+    store = DocumentStore(tmp_path)
+    monkeypatch.setattr(main, "store", store)
+    main.jev_page_ids.clear()
+    store.create(DocumentRecord(id="book", file_name="example.pdf", state="ready", page_count=20))
+    scene = store.scene_dir("book") / "pages"
+    scene.mkdir(parents=True)
+    words = [
+        {"id": index, "text": word}
+        for index, word in enumerate("Who are we? More details follow here.".split())
+    ]
+    (scene / "page-0008.json").write_text(json.dumps({"number": 8, "words": words}))
+    store.focus_dir("book").mkdir(exist_ok=True)
+    (store.focus_dir("book") / "page-0008.json").write_text(json.dumps({
+        "focusWordIds": [], "contextWordIds": [], "pageKind": "reading",
+    }))
+
+    async def score(self, pages):
+        return {8: {"essential": [], "context": []}}
+
+    monkeypatch.setattr(JevFocusClient, "select", score)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://test") as browser:
+        result = await browser.post(
+            "/api/documents/book/focus/8/openrouter",
+            headers={"Authorization": "Bearer sample"},
+        )
+
+    assert result.status_code == 200
+    assert result.json()["focusWordIds"] == [0, 1, 2]
 
 
 def test_layout_breaks_stop_title_and_attribution_entering_opening_sentence(tmp_path):
