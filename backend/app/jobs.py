@@ -60,14 +60,10 @@ class JobManager:
                         self.store.update(document_id, progress=0.05 + 0.42 * current / total, message=f"Rebuilding page {current} of {total}")
 
                 def source_progress(stage: str, current: int, total: int) -> None:
-                    if not total:
+                    if not total or stage != "encode":
                         return
-                    if stage == "render":
-                        value = 0.47 + 0.08 * current / total
-                        message = f"Rendering original page {current} of {total}"
-                    else:
-                        value = 0.55 + 0.05 * current / total
-                        message = f"Optimizing page preview {current} of {total}"
+                    value = 0.47 + 0.13 * current / total
+                    message = f"Preparing original page {current} of {total}"
                     self.store.update(document_id, progress=value, message=message)
 
                 source = self.store.source_path(document_id)

@@ -7,7 +7,6 @@ import os
 import re
 import shutil
 import subprocess
-import time
 from pathlib import Path
 
 import pdfplumber
@@ -234,30 +233,29 @@ def render_sources(
 ) -> bool:
     target = output / "source-pages"
     target.mkdir(parents=True, exist_ok=True)
-    process = subprocess.Popen(
-        [executable, "-png", "-r", str(dpi), str(pdf), str(target / "page")],
-    )
-    last_rendered = -1
-    while process.poll() is None:
-        rendered = len(list(target.glob("page-*.png")))
-        if progress and rendered != last_rendered:
-            progress("render", rendered, total_pages)
-            last_rendered = rendered
-        time.sleep(0.2)
-    if process.returncode:
-        raise subprocess.CalledProcessError(process.returncode, process.args)
-    paths = sorted(target.glob("page-*.png"))
-    if progress:
-        progress("render", len(paths), total_pages)
-    for index, path in enumerate(paths, 1):
-        number = int(path.stem.rsplit("-", 1)[1])
-        final = target / f"page-{number:04d}.webp"
-        with Image.open(path) as image:
-            image.save(final, "WEBP", quality=82, method=2)
-        path.unlink()
-        if progress and (index == len(paths) or index % 5 == 0):
-            progress("encode", index, len(paths))
-    return bool(paths)
+    # Process small batches so temporary RGB images do not accumulate for an entire book.
+    batch_size = 4
+    for first in range(1, total_pages + 1, batch_size):
+        last = min(first + batch_size - 1, total_pages)
+        subprocess.run(
+            [executable, "-f", str(first), "-l", str(last), "-r", str(dpi),
+             str(pdf), str(target / "page")],
+            check=True,
+        )
+        if progress:
+            progress("render", last, total_pages)
+        paths = sorted(target.glob("page-*.ppm"))
+        if len(paths) != last - first + 1:
+            raise RuntimeError("The PDF renderer returned an incomplete batch of pages.")
+        for path in paths:
+            number = int(path.stem.rsplit("-", 1)[1])
+            final = target / f"page-{number:04d}.webp"
+            with Image.open(path) as image:
+                image.save(final, "WEBP", quality=82, method=2)
+            path.unlink()
+            if progress:
+                progress("encode", number, total_pages)
+    return total_pages > 0
 
 
 def convert_pdf(
