@@ -126,7 +126,13 @@ export class UploadController {
     try {
       this.update({ state: "queued", message: "Receiving document", progress: .02 });
       const uploadFile = await this.prepareUpload(file);
-      const upload = await this.api.upload(uploadFile, ratio => this.update({ state: "uploading", message: "Receiving document", progress: ratio * .08 }));
+      const upload = await this.api.upload(uploadFile, ratio => this.update({
+        state: "uploading",
+        message: ratio < 1
+          ? `Uploading file · ${Math.round(ratio * 100)}% sent`
+          : "Upload sent · waiting for the server",
+        progress: ratio * .08,
+      }));
       const result = await this.api.waitUntilReadable(upload.document.id, document => this.update(document));
       await this.finish();
       await this.onReady(result);

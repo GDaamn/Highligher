@@ -136,7 +136,7 @@ async def upload_document(jobs: Library, file: UploadFile = File(...)) -> Upload
         )
         jobs.start(resumable.id)
         return UploadResponse(document=resumable, status_url=f"/api/documents/{resumable.id}", cached=True)
-    metadata = extract_book_metadata(destination, file_name)
+    metadata = await asyncio.to_thread(extract_book_metadata, destination, file_name)
     record = store.update(
         document_id,
         display_title=metadata.title,
