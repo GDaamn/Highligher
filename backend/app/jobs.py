@@ -42,7 +42,7 @@ class JobManager:
     def resume_incomplete(self) -> None:
         for document in self.store.list_ready():
             if (document.state == "ready" and document.focus_provider == self.settings.focus_provider
-                    and self.settings.focus_provider == "heuristic"
+                    and self.settings.focus_provider in {"heuristic", "jev"}
                     and document.focus_strategy_version != FOCUS_STRATEGY_VERSION):
                 self.start(document.id)
         for document in self.store.list_incomplete():
