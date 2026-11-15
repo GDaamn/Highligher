@@ -65,7 +65,7 @@ async def _document_or_404(document_id: str) -> DocumentRecord:
 async def health() -> HealthResponse:
     return HealthResponse(
         focus_provider=settings.focus_provider,
-        deepseek_configured=bool(settings.deepseek_api_key),
+        openrouter_configured=bool(settings.openrouter_api_key),
         supported_extensions=sorted(supported_extensions()),
     )
 

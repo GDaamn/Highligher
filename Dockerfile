@@ -3,7 +3,6 @@ FROM python:3.14-slim-bookworm
 COPY --from=uv /uv /usr/local/bin/uv
 
 RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils && rm -rf /var/lib/apt/lists/*
-ENV FOCUS_PROVIDER=heuristic
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY vendor/RenderEngine vendor/RenderEngine

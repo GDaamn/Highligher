@@ -20,9 +20,7 @@ FastAPI serves the browser interface, renderer assets, and API from the same ori
 | --- | --- |
 | `PORT` | Render supplies the listening port. The container defaults to 10000 locally. |
 | `HIGHLIGHTER_DATA_DIR` | Blueprint uses `/var/data/booklamp` on the persistent disk. Local launches default to `data/`. |
-| `FOCUS_PROVIDER` | Blueprint uses `heuristic` for offline focus analysis. To enable AI analysis, change the Blueprint value to `deepseek` and set the key below. |
-| `DEEPSEEK_API_KEY` | Set as a secret in the Render service environment when using DeepSeek. |
-| `DEEPSEEK_MODEL`, `DEEPSEEK_BASE_URL` | Optional overrides. Defaults are `deepseek-v4-flash` and `https://api.deepseek.com`. |
+| `OPENROUTER_API_KEY` | Set this secret in Render to enable OpenRouter scoring during import. Without it, uploads use local sentence highlighting. |
 | `MAX_UPLOAD_MB` | Per-file upload limit in MiB. Defaults to 100. |
 | `FOCUS_BATCH_CHARACTERS`, `FOCUS_CONCURRENCY` | Focus analysis batch size and concurrency. Defaults are 42000 and 24. |
 | `REPLICA_ENGINE_DIR`, `REPLICA_PDFTOPPM` | Optional paths to custom browser renderer assets and the Poppler executable. The image includes both. |
@@ -38,8 +36,7 @@ The launcher uses offline focus analysis by default, so it works without an API
 key. On a new Mac it needs Python 3.12+ and [`uv`](https://docs.astral.sh/uv/); it
 will prepare the app's isolated environment automatically on first launch.
 
-To use DeepSeek focus analysis, copy `.env.example` to `.env`, add your API key,
-and set `FOCUS_PROVIDER=deepseek` before launching.
+For server-side OpenRouter scoring on macOS, set `OPENROUTER_API_KEY` in the launcher’s `.env` file.
 
 ## Run from Terminal
 
@@ -47,14 +44,7 @@ Requirements: Python 3.12+ and `uv`.
 
 ```bash
 uv sync --extra dev
-export DEEPSEEK_API_KEY="your-key"
 uv run uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8010
-```
-
-For offline use:
-
-```bash
-FOCUS_PROVIDER=heuristic uv run uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8010
 ```
 
 Open `http://127.0.0.1:8010`.
@@ -77,4 +67,4 @@ uv run pytest -q
 
 The offline heuristic ranks complete sentences within short passages using recurring terms, claim cues, and questions. Unselected prose stays readable. Open **OpenRouter** on the home screen or reader toolbar, enter your key, and choose **Use Jev**. The tab sends passages through BookLamp to OpenRouter as you read, including in existing books. Reloading the tab or choosing **Clear key** removes the key. If a request fails, the reader shows the error and uses saved highlights.
 
-For server-wide scoring during import, set `FOCUS_PROVIDER=jev` and `OPENROUTER_API_KEY` in the launcher’s .env or Render environment. `JEV_MODEL` defaults to `typesafe/jev-1.14`. Both modes use the OpenRouter Decisions API and a sentence relevance threshold of 0.65.
+For server-wide scoring during import, set `OPENROUTER_API_KEY` in the launcher’s .env or Render environment. `JEV_MODEL` defaults to `typesafe/jev-1.14`. Both modes use the OpenRouter Decisions API and a sentence relevance threshold of 0.65.

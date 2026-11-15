@@ -9,7 +9,6 @@ from replica import convert_document
 
 from .config import Settings
 from .services.jev import JevFocusClient
-from .services.deepseek import DeepSeekFocusClient
 from .services.focus import FOCUS_STRATEGY_VERSION, INITIAL_FOCUS_RATIO, FocusAnalyzer
 from .services.structure import build_structure
 from .store import DocumentStore
@@ -95,7 +94,7 @@ class JobManager:
                 focus_model=self.focus_model,
                 focus_strategy_version=FOCUS_STRATEGY_VERSION,
             )
-            analyzer = self._focus_analyzer(document_id)
+            analyzer = self._focus_analyzer()
             reader_open = False
 
             def focus_progress(current: int, total: int) -> None:
@@ -158,17 +157,8 @@ class JobManager:
             return cls._error_message(error.exceptions[0])
         return str(error) or error.__class__.__name__
 
-    def _focus_analyzer(self, document_id: str) -> FocusAnalyzer:
+    def _focus_analyzer(self) -> FocusAnalyzer:
         client = None
-        if self.settings.focus_provider == "deepseek":
-            if not self.settings.deepseek_api_key:
-                raise RuntimeError("DEEPSEEK_API_KEY is not configured on the server.")
-            client = DeepSeekFocusClient(
-                api_key=self.settings.deepseek_api_key,
-                base_url=self.settings.deepseek_base_url,
-                model=self.settings.deepseek_model,
-                user_id=f"booklamp-{document_id}",
-            )
         if self.settings.focus_provider == "jev":
             if not self.settings.openrouter_api_key:
                 raise RuntimeError("OPENROUTER_API_KEY is required for Jev sentence analysis.")
@@ -185,4 +175,4 @@ class JobManager:
     def focus_model(self) -> str:
         if self.settings.focus_provider == "jev":
             return self.settings.jev_model
-        return self.settings.deepseek_model if self.settings.focus_provider == "deepseek" else "local-heuristic"
+        return "local-heuristic"

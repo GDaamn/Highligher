@@ -104,10 +104,6 @@ document.querySelector("#new-document").addEventListener("click", () => {
 
 api.health().then(health => {
   uploader.setSupportedExtensions(health.supported_extensions || [".pdf", ".epub"]);
-  if (health.focus_provider === "deepseek" && !health.deepseek_configured) {
-    warning.textContent = "DeepSeek is not configured yet. Set DEEPSEEK_API_KEY on the Python server before uploading.";
-    warning.hidden = false;
-  }
 }).catch(() => {
   warning.textContent = "The processing server is offline.";
   warning.hidden = false;
