@@ -11,5 +11,3 @@ services:
     envVars:
       - key: HIGHLIGHTER_DATA_DIR
         value: /var/data/booklamp
-      - key: FOCUS_PROVIDER
-        value: heuristic

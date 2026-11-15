@@ -18,10 +18,6 @@ if [[ -f "$BOOKLAMP_ROOT/.env" ]]; then
   set +a
 fi
 
-# The local heuristic keeps the app useful without an account or API key. A
-# value set in .env still takes precedence for users who want DeepSeek focus.
-export FOCUS_PROVIDER="${FOCUS_PROVIDER:-heuristic}"
-
 print ""
 print "  BookLamp"
 print "  Opening at ${BOOKLAMP_URL}"

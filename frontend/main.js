@@ -104,45 +104,7 @@ document.querySelector("#new-document").addEventListener("click", () => {
 
 api.health().then(health => {
   uploader.setSupportedExtensions(health.supported_extensions || [".pdf", ".epub"]);
-  if (health.focus_provider === "deepseek" && !health.deepseek_configured) {
-    warning.textContent = "DeepSeek is not configured yet. Set DEEPSEEK_API_KEY on the Python server before uploading.";
-    warning.hidden = false;
-  }
 }).catch(() => {
   warning.textContent = "The processing server is offline.";
   warning.hidden = false;
 });
-
-const keyDialog = document.querySelector("#key-dialog");
-const keyInput = document.querySelector("#router-key");
-const keyStatus = document.querySelector("#key-status");
-
-for (const button of document.querySelectorAll(".key-settings")) {
-  button.onclick = () => {
-    keyInput.value = "";
-    keyStatus.textContent = api.routerKey ? "Jev is enabled for this tab." : "Using saved highlights.";
-    keyDialog.showModal();
-  };
-}
-function changeKey(key) {
-  api.routerKey = key;
-  api.focusRevision++;
-  keyDialog.close();
-  if (reader?.focus) {
-    reader.focus.cache.clear();
-    reader.focus.applyNearby(reader.engine.pageNumber);
-  }
-  notify(key ? "Jev enabled for this tab." : "Using saved highlights.");
-}
-document.querySelector("#key-form").onsubmit = event => {
-  event.preventDefault();
-  const key = keyInput.value.trim();
-  if (!key || /[^!-~]/.test(key)) {
-    keyStatus.textContent = "Enter an OpenRouter API key.";
-    return;
-  }
-  changeKey(key);
-};
-document.querySelector("#forget-key").onclick = () => changeKey("");
-document.querySelector("#close-key").onclick = () => keyDialog.close();
-keyDialog.onclose = () => { keyInput.value = ""; };

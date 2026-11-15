@@ -45,7 +45,7 @@ class UploadResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     focus_provider: str
-    deepseek_configured: bool
+    openrouter_configured: bool
     supported_extensions: list[str] = Field(default_factory=list)
 
 

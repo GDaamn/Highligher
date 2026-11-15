@@ -334,11 +334,3 @@ body:has(#reader-view:not([hidden])) .reader-view { height: 100vh; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
-
-.key-settings, #key-dialog button { border: 1px solid var(--line-dark); border-radius: 4px; background: var(--shell-light); color: var(--ink); padding: 5px 9px; }
-#key-dialog { width: min(380px, 92vw); border: 1px solid var(--line-dark); border-radius: 8px; background: var(--paper); padding: 22px; }
-#key-dialog::backdrop { background: rgb(18 20 18 / 45%); }
-#key-dialog h2 { margin: 0 0 18px; font-size: 20px; }
-#key-dialog label { display: block; margin-bottom: 6px; font-weight: bold; }
-#key-dialog input { width: 100%; padding: 8px; }
-#key-dialog p { font-size: 14px; line-height: 1.4; }
