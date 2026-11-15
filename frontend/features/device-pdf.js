@@ -1,4 +1,4 @@
-import { GlobalWorkerOptions, getDocument, Util } from "/vendor/pdfjs/pdf.min.mjs";
+import { GlobalWorkerOptions, getDocument, OPS, Util } from "/vendor/pdfjs/pdf.min.mjs";
 import { PdfReplicaEngine } from "/engine/replica-engine.js";
 import { cacheDevicePage, changePreferences, readDevice, saveDeviceBook } from "../lib/device-library.js";
 import { metadataFromFilename } from "../lib/book-metadata.js";
@@ -38,7 +38,7 @@ export async function importPdf(file) {
   }
 }
 
-function wordBoxes(content, viewport, context) {
+function wordBoxes(content, viewport, context, fonts) {
   const words = [];
   for (const item of content.items) {
     if (!item.str?.trim()) continue;
@@ -46,7 +46,8 @@ function wordBoxes(content, viewport, context) {
     const height = Math.hypot(matrix[2], matrix[3]);
     if (!height || !item.width) continue;
     const style = content.styles[item.fontName] || {};
-    context.font = height + "px " + (style.fontFamily || "sans-serif");
+    const face = fonts.has(item.fontName) ? fonts.get(item.fontName) : null;
+    context.font = height + "px " + (face?.loadedName || style.fontFamily || "sans-serif");
     const angle = Math.atan2(matrix[1], matrix[0]);
     const ascent = height * (style.ascent ?? 0.8);
     const spans = item.str.match(/\s+|\S+/gu);
@@ -57,7 +58,8 @@ function wordBoxes(content, viewport, context) {
       const width = widths[index] * scale;
       const offset = item.dir === "rtl" ? item.width * viewport.scale - advance - width : advance;
       if (span.trim()) words.push({
-        id: words.length, text: span, width, height, angle,
+        id: words.length, text: span, width, height, angle, size: height,
+        baseline: matrix[5], font: face?.name || "", color: "#171817",
         x: matrix[4] + Math.cos(angle) * offset + Math.sin(angle) * ascent,
         y: matrix[5] + Math.sin(angle) * offset - Math.cos(angle) * ascent,
       });
@@ -65,6 +67,26 @@ function wordBoxes(content, viewport, context) {
     });
   }
   return words;
+}
+
+const textPaint = new Set([OPS.showText, OPS.showSpacedText, OPS.nextLineShowText, OPS.nextLineSetSpacingShowText]);
+
+function hasVisibleText(ops) {
+  const stack = [];
+  let mode = 0;
+  for (let i = 0; i < ops.fnArray.length; i++) {
+    const op = ops.fnArray[i];
+    if (op === OPS.save) stack.push(mode);
+    else if (op === OPS.restore) mode = stack.pop() ?? 0;
+    else if (op === OPS.setTextRenderingMode) mode = ops.argsArray[i][0];
+    else if (textPaint.has(op) && (mode & 3) !== 3) return true;
+  }
+  return false;
+}
+
+function encodeCanvas(canvas) {
+  return new Promise((resolve, reject) => canvas.toBlob(
+    blob => blob ? resolve(blob) : reject(new Error("Could not render PDF page.")), "image/webp", .90));
 }
 
 const stop = new Set("a an and are as at be been but by for from had has have he her his i if in into is it its of on or our she that the their there they this to was we were which who will with you your".split(" "));
@@ -132,7 +154,7 @@ export class DevicePdfEngine extends PdfReplicaEngine {
 
   async prepare(number) {
     const cached = await readDevice("pages", [this.record.id, number]);
-    if (cached) return cached;
+    if (cached?.typographyVersion === 1) return cached;
     const page = await this.pdf.getPage(number);
     const viewport = page.getViewport({scale: 1});
     const scale = Math.min(1.67, 2400 / Math.max(viewport.width, viewport.height));
@@ -142,16 +164,30 @@ export class DevicePdfEngine extends PdfReplicaEngine {
     canvas.height = Math.ceil(pixels.height);
     try {
       await page.render({canvas, viewport: pixels}).promise;
-      const words = wordBoxes(await page.getTextContent(), viewport, canvas.getContext("2d"));
-      const image = await new Promise((resolve, reject) => canvas.toBlob(
-        blob => blob ? resolve(blob) : reject(new Error("Could not render PDF page.")), "image/webp", .90));
-      const result = { number, width: viewport.width, height: viewport.height, words, image, focusWordIds: rankedWords(words) };
+      const words = wordBoxes(await page.getTextContent(), viewport, canvas.getContext("2d"), page.commonObjs);
+      const image = await encodeCanvas(canvas);
+      const result = { typographyVersion: 1, number, width: viewport.width, height: viewport.height,
+        words, image, mode: "digital", focusWordIds: rankedWords(words) };
       if (number === 1) {
         const cover = document.createElement("canvas");
         cover.width = 120;
         cover.height = Math.min(200, Math.max(1, Math.round(120 * canvas.height / canvas.width)));
         cover.getContext("2d").drawImage(canvas, 0, 0, cover.width, cover.height);
         result.thumbnail = cover.toDataURL("image/webp", .8);
+      }
+      if (words.length) {
+        const ops = await page.getOperatorList();
+        if (hasVisibleText(ops)) {
+          // Keep illustrations, rules and backgrounds. Highlighter lays out the live text.
+          await page.render({canvas, viewport: pixels,
+            operationsFilter: index => !textPaint.has(ops.fnArray[index])}).promise;
+          result.artwork = await encodeCanvas(canvas);
+        } else {
+          // Scanned pages carry invisible OCR. Use the reader's scan layout.
+          result.mode = "scan";
+        }
+      } else {
+        result.artwork = image;
       }
       await cacheDevicePage(this.record.id, result).catch(() => {}); // Reading also works with a full cache.
       return result;
@@ -161,9 +197,18 @@ export class DevicePdfEngine extends PdfReplicaEngine {
     }
   }
 
-  setSourceVisible(visible) {
-    // Both modes share the original artwork; CSS switches the word overlays.
-    super.setSourceVisible(visible, {render: false});
+  url(path) {
+    const match = /^source-pages\/page-(\d+)\.webp$/.exec(path);
+    if (match && this.urls.has(Number(match[1]))) return this.urls.get(Number(match[1])).original;
+    return super.url(path);
+  }
+
+  releaseImages(number) {
+    const urls = this.urls.get(number);
+    if (!urls) return;
+    URL.revokeObjectURL(urls.original);
+    if (urls.artwork) URL.revokeObjectURL(urls.artwork);
+    this.urls.delete(number);
   }
 
   onPageIntersections(entries) {
@@ -178,38 +223,24 @@ export class DevicePdfEngine extends PdfReplicaEngine {
       placeholder.textContent = number;
       view.shell.replaceChildren(placeholder);
       view.page = view.data = view.layout = null;
-      URL.revokeObjectURL(this.urls.get(number));
-      this.urls.delete(number);
+      this.releaseImages(number);
     }
   }
 
   renderPage(data, view) {
-    const page = view.page;
-    page.classList.add("device-pdf-page");
-    page.classList.toggle("replica-source-visible", this.sourceVisible);
-    Object.assign(page.style, {width: data.width + "px", height: data.height + "px"});
-    const image = document.createElement("img");
-    if (!this.urls.has(data.number)) this.urls.set(data.number, URL.createObjectURL(data.image));
-    image.src = this.urls.get(data.number);
-    image.className = "device-page-image";
-    image.alt = "Original page " + data.number;
-    const layer = document.createDocumentFragment();
-    for (const word of data.words) {
-      const box = document.createElement("span");
-      box.className = "replica-word-box";
-      box.dataset.wordId = word.id;
-      box.textContent = word.text;
-      Object.assign(box.style, {left: word.x+"px", top: word.y+"px", width: word.width+"px",
-        height: word.height+"px", fontSize: word.height+"px", transform: `rotate(${word.angle}rad)`});
-      layer.append(box);
+    if (!this.urls.has(data.number)) {
+      this.urls.set(data.number, { original: URL.createObjectURL(data.image),
+        artwork: data.artwork ? URL.createObjectURL(data.artwork) : null });
     }
-    page.replaceChildren(image, layer);
-    this.applyZoom(view);
+    const artwork = this.urls.get(data.number).artwork;
+    const images = artwork ? [{src: artwork, x: 0, y: 0, width: data.width, height: data.height}] : [];
+    view.page.classList.add("device-pdf-page");
+    super.renderPage({...data, images}, view);
   }
 
   destroy() {
     super.destroy();
-    for (const url of this.urls.values()) URL.revokeObjectURL(url);
+    for (const number of this.urls.keys()) this.releaseImages(number);
     this.pdf?.destroy();
   }
 }
