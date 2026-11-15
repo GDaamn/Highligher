@@ -17,7 +17,7 @@ from .focus_rules import (
 )
 
 
-FOCUS_STRATEGY_VERSION = 20
+FOCUS_STRATEGY_VERSION = 21
 INITIAL_FOCUS_RATIO = 0.3
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 
 import pytest
 
@@ -386,7 +387,9 @@ async def test_sentence_provider_cannot_leave_a_reading_page_empty(tmp_path):
         set(range(6, 14)),
         set(range(14, 20)),
     ]
-    assert set(result["focusWordIds"]) in sentence_ids
+    selected = set(result["focusWordIds"])
+    assert len(selected) >= math.ceil(len(words) * 0.5)
+    assert all(not selected.intersection(sentence) or sentence <= selected for sentence in sentence_ids)
     assert result["contextWordIds"] == []
 
 
