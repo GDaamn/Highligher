@@ -65,6 +65,6 @@ uv run pytest -q
 
 ### Sentence highlighting
 
-The offline heuristic ranks complete sentences within short passages using recurring terms, claim cues, and questions. Unselected prose stays readable. Open **OpenRouter** on the home screen or reader toolbar, enter your key, and choose **Use Jev**. The tab sends passages through BookLamp to OpenRouter as you read, including in existing books. Reloading the tab or choosing **Clear key** removes the key. If a request fails, the reader shows the error and uses saved highlights.
+The offline heuristic ranks complete sentences within short passages using recurring terms, claim cues, and questions. Unselected prose stays readable.
 
-For server-wide scoring during import, set `OPENROUTER_API_KEY` in the launcher’s .env or Render environment. `JEV_MODEL` defaults to `typesafe/jev-1.14`. Both modes use the OpenRouter Decisions API and a sentence relevance threshold of 0.65.
+For server-wide scoring during import, set `OPENROUTER_API_KEY` in the launcher’s .env or Render environment. `JEV_MODEL` defaults to `typesafe/jev-1.14`. Server-side scoring uses the OpenRouter Decisions API and a sentence relevance threshold of 0.65.

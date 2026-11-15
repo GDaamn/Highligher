@@ -1,7 +1,4 @@
 export class HighlighterApi {
-  routerKey = "";
-  focusRevision = 0;
-
   async health() {
     return this.#json(fetch("/api/health"));
   }
@@ -58,15 +55,8 @@ export class HighlighterApi {
     return this.#json(fetch(`/api/documents/${documentId}`));
   }
 
-  async savedFocus(documentId, pageNumber) {
-    return this.#json(fetch(`/api/documents/${documentId}/focus/${pageNumber}`));
-  }
-
   async focus(documentId, pageNumber) {
-    const url = `/api/documents/${documentId}/focus/${pageNumber}`;
-    const response = this.routerKey
-      ? await fetch(url + "/openrouter", { method: "POST", headers: { Authorization: "Bearer " + this.routerKey } })
-      : await fetch(url);
+    const response = await fetch(`/api/documents/${documentId}/focus/${pageNumber}`);
     if (response.status === 404) return null;
     return this.#json(response);
   }

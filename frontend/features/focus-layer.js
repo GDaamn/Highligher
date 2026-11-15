@@ -29,9 +29,9 @@ export class FocusLayer {
     this.activePage = this.engine.pageNumber;
     await this.refreshAvailability({ apply: false });
     const visible = [this.activePage - 1, this.activePage, this.activePage + 1];
-    if (!this.api.routerKey) await Promise.all(visible.map(page => this.applyIfReady(page)));
+    await Promise.all(visible.map(page => this.applyIfReady(page)));
     for (const page of this.readyPages) {
-      if (!this.api.routerKey && !visible.includes(page) && this.engine.getPageElement(page)) this.applySafely(page);
+      if (!visible.includes(page) && this.engine.getPageElement(page)) this.applySafely(page);
     }
     this.engine.addEventListener("pagechange", this.pageListener);
     this.engine.addEventListener("pagerender", this.renderListener);
@@ -60,21 +60,9 @@ export class FocusLayer {
 
   async apply(pageNumber = this.engine.pageNumber) {
     if (this.destroyed) return;
-    if (this.api.routerKey && (!this.enabled || Math.abs(this.engine.pageNumber - pageNumber) > 1)) return;
     let page = this.engine.getPageElement(pageNumber);
     page?.classList.add("focus-pending");
-    const revision = this.api.focusRevision;
-    let focus;
-    try {
-      focus = await this.load(pageNumber);
-    } catch (error) {
-      if (revision !== this.api.focusRevision) return;
-      if (!this.api.routerKey) throw error;
-      globalThis.dispatchEvent(new CustomEvent("highlighter:error", { detail: error }));
-      focus = await this.api.savedFocus(this.documentId, pageNumber);
-      if (revision === this.api.focusRevision) this.cache.set(pageNumber, Promise.resolve(focus));
-    }
-    if (revision !== this.api.focusRevision) return;
+    const focus = await this.load(pageNumber);
     if (this.destroyed) return;
     page = this.engine.getPageElement(pageNumber);
     if (!page) return;
@@ -139,10 +127,8 @@ export class FocusLayer {
   }
 
   setOnly(enabled) {
-    const enteringFocus = enabled && !this.enabled;
     this.enabled = Boolean(enabled);
     this.root.classList.toggle("focus-only", Boolean(enabled));
-    if (enteringFocus && this.api.routerKey) this.applyNearby(this.engine.pageNumber);
   }
 
   async toggleManualDim(pageNumber, page, event) {
@@ -177,8 +163,7 @@ export class FocusLayer {
     word.classList.add("focus-corrected");
     try {
       const payload = await this.api.setWordFocus(this.documentId, pageNumber, wordId, focused);
-      if (this.api.routerKey) this.cache.delete(pageNumber);
-      else this.cache.set(pageNumber, Promise.resolve(payload));
+      this.cache.set(pageNumber, Promise.resolve(payload));
       await this.apply(pageNumber);
       globalThis.dispatchEvent(new CustomEvent("highlighter:notice", {
         detail: focused ? "Kept in focus" : "Moved to quiet text",
