@@ -25,7 +25,11 @@ export class HighlighterApi {
       });
       request.addEventListener("load", () => {
         if (request.status >= 200 && request.status < 300) resolve(request.response);
-        else reject(new Error(request.response?.detail || "Upload failed."));
+        else if ([502, 503, 504].includes(request.status)) {
+          reject(new Error(`The service was unavailable during upload (HTTP ${request.status}). Check your library before trying again.`));
+        } else {
+          reject(new Error(request.response?.detail || `Upload failed (HTTP ${request.status}).`));
+        }
       });
       request.addEventListener("error", async () => {
         try {
@@ -51,8 +55,8 @@ export class HighlighterApi {
     return this.#json(response);
   }
 
-  async document(documentId) {
-    return this.#json(fetch(`/api/documents/${documentId}`));
+  async document(documentId, signal) {
+    return this.#json(fetch(`/api/documents/${documentId}`, { signal }));
   }
 
   async focus(documentId, pageNumber) {
@@ -98,8 +102,25 @@ export class HighlighterApi {
   }
 
   async waitUntilReadable(documentId, onUpdate, { interval = 700 } = {}) {
+    let interruptions = 0;
+    let lastStatus = { state: "queued", progress: 0.08 };
     while (true) {
-      const document = await this.document(documentId);
+      let document;
+      try {
+        document = await this.document(documentId, AbortSignal.timeout(15000));
+      } catch (error) {
+        const transient = error instanceof TypeError || error.name === "TimeoutError"
+          || [502, 503, 504].includes(error.status);
+        if (!transient) throw error;
+        if (++interruptions > 6) {
+          throw new Error("Upload accepted, but the server is still unavailable. Check your library after it reconnects.");
+        }
+        onUpdate({ ...lastStatus, message: "Upload accepted. Reconnecting to check progress…" });
+        await new Promise(resolve => setTimeout(resolve, Math.min(1000 * 2 ** (interruptions - 1), 8000)));
+        continue;
+      }
+      interruptions = 0;
+      lastStatus = document;
       onUpdate(document);
       if (["readable", "ready"].includes(document.state)) return document;
       if (document.state === "error") throw new Error(document.error || document.message);
@@ -110,7 +131,11 @@ export class HighlighterApi {
   async #json(responseOrPromise) {
     const response = await responseOrPromise;
     const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.detail || `Request failed (${response.status}).`);
+    if (!response.ok) {
+      const error = new Error(body.detail || `Request failed (${response.status}).`);
+      error.status = response.status;
+      throw error;
+    }
     return body;
   }
 }

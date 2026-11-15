@@ -332,6 +332,7 @@ def _convert_pdf(
             }
             editable_word_count += len(words)
             write_page(output, record)
+            page.close()
             if progress:
                 progress(number, len(document.pages))
 
