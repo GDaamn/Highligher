@@ -36,7 +36,8 @@ async def test_reader_key_applies_to_existing_page_without_changing_saved_focus(
     from backend.app.store import DocumentStore
 
     store = DocumentStore(tmp_path)
-    monkeypatch.setattr(main, "store", store)
+    manager = main.JobManager(main.settings, store)
+    monkeypatch.setitem(main.app.dependency_overrides, main.libraries.for_request, lambda: manager)
     store.create(DocumentRecord(id="book", file_name="example.pdf", state="ready", page_count=20))
     scene = store.scene_dir("book") / "pages"
     scene.mkdir(parents=True)

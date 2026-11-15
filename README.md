@@ -12,7 +12,7 @@ The document converters and browser renderer are included under `vendor/RenderEn
 2. In Render, choose **New → Blueprint**, connect the repository, review the paid Starter service and 1 GB persistent disk, and deploy.
 3. Open the service URL. Check `/api/health` for the focus provider and supported file types, then upload a PDF or EPUB.
 
-FastAPI serves the browser interface, renderer assets, and API from the same origin. The image installs Poppler for PDF source-page previews and runs `uv sync --locked --no-dev`. Uvicorn runs as one process on `0.0.0.0` using Render’s assigned `PORT`. Uploads, processed books, and reading preferences share the persistent disk. The hosted library starts empty. Anyone with access to the service can view and modify the shared library.
+FastAPI serves the browser interface, renderer assets, and API from the same origin. The image installs Poppler for PDF source-page previews and runs `uv sync --locked --no-dev`. Uvicorn runs as one process on `0.0.0.0` using Render’s assigned `PORT`. Uploads, processed books, and reading preferences share the persistent disk. Each browser profile has a private library identified by an HTTP-only cookie. Clearing the cookie loses access. People using the same browser profile share its library. The server stores and processes the files. Existing uploads from the older shared library stay on disk and are excluded from visitor libraries. Re-upload a book to add it to a private library.
 
 ### Environment settings
 
