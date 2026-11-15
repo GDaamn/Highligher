@@ -24,7 +24,38 @@ async def test_jev_keeps_the_entire_sentence_across_pages():
                  for i, line in enumerate(["Who are", "we? More later."], 1)]
         result = await client.select(pages)
         assert result[1]["essential"] == [0, 1]
-        assert result[2]["essential"] == [0]
+        assert result[2]["essential"] == [0, 1, 2]
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_jev_fills_half_the_page_with_the_highest_scoring_sentences():
+    client = JevFocusClient("test", "typesafe/jev-1.14")
+    await client.http.aclose()
+
+    def answer(request):
+        body = json.loads(request.content)
+        assert len(body["state"]) == 4
+        return httpx.Response(200, json={"answers": {
+            "s0": {"noul": .9}, "s1": {"noul": .6},
+            "s2": {"noul": .4}, "s3": {"noul": .2},
+        }})
+
+    client.http = httpx.AsyncClient(transport=httpx.MockTransport(answer))
+    text = (
+        "The first event changes everything. The second explains the consequence. "
+        "A minor detail follows afterward. Another detail closes the scene."
+    )
+    page = {
+        "page": 8,
+        "words": [{"id": index, "text": word} for index, word in enumerate(text.split())],
+    }
+    try:
+        result = await client.select([page])
+        selected = set(result[8]["essential"])
+        assert selected == set(range(0, 10))
+        assert len(selected) >= len(page["words"]) / 2
     finally:
         await client.close()
 
@@ -109,7 +140,8 @@ async def test_reader_key_falls_back_to_a_page_summary_when_jev_selects_nothing(
     from backend.app.store import DocumentStore
 
     store = DocumentStore(tmp_path)
-    monkeypatch.setattr(main, "store", store)
+    manager = main.JobManager(main.settings, store)
+    monkeypatch.setitem(main.app.dependency_overrides, main.libraries.for_request, lambda: manager)
     main.jev_page_ids.clear()
     store.create(DocumentRecord(id="book", file_name="example.pdf", state="ready", page_count=20))
     scene = store.scene_dir("book") / "pages"
@@ -135,7 +167,7 @@ async def test_reader_key_falls_back_to_a_page_summary_when_jev_selects_nothing(
         )
 
     assert result.status_code == 200
-    assert result.json()["focusWordIds"] == [0, 1, 2]
+    assert result.json()["focusWordIds"] == list(range(7))
 
 
 def test_layout_breaks_stop_title_and_attribution_entering_opening_sentence(tmp_path):

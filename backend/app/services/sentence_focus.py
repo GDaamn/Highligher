@@ -6,6 +6,10 @@ from collections import Counter
 from .focus_rules import STOP_WORDS, normalized_word
 
 
+MINIMUM_SUMMARY_WORD_RATIO = 0.5
+LOCAL_SUMMARY_SENTENCE_RATIO = 0.5
+
+
 def passages(pages):
     sentences, current = [], []
     previous = None
@@ -46,7 +50,7 @@ def passages(pages):
         yield sentences
 
 
-def local_ranking(sentences):
+def ranked_sentence_indices(sentences):
     terms = [{normalized_word(word) for _, word in s} - STOP_WORDS - {''} for s in sentences]
     frequency = Counter(term for group in terms for term in group)
     scores = []
@@ -55,8 +59,13 @@ def local_ranking(sentences):
         text = ' '.join(word['text'] for _, word in sentence)
         claim = bool(re.search(r'\b(because|therefore|means|creates|requires|explains|cannot|depends)\b', text, re.I))
         scores.append(overlap + claim + (0.65 if '?' in text else 0) + (0.45 if i == 0 else 0))
-    order = sorted(range(len(sentences)), key=scores.__getitem__, reverse=True)
-    return set(order[:max(1, round(len(order) * .32))])
+    return sorted(range(len(sentences)), key=scores.__getitem__, reverse=True)
+
+
+def local_ranking(sentences):
+    order = ranked_sentence_indices(sentences)
+    count = max(1, math.ceil(len(order) * LOCAL_SUMMARY_SENTENCE_RATIO))
+    return set(order[:count])
 
 
 def add_sentence(result, sentence):
@@ -73,7 +82,7 @@ def local_layers(pages):
 
 
 def page_summary_word_ids(page, proposed=None):
-    """Return ordered IDs for at least one complete summary sentence on a page."""
+    """Return complete summary sentences covering at least half of a reading page."""
     ordered_ids = [int(word["id"]) for word in page["words"]]
     valid_ids = set(ordered_ids)
     proposed = proposed or {}
@@ -82,7 +91,20 @@ def page_summary_word_ids(page, proposed=None):
         for word_id in proposed.get("essential", [])
         if int(word_id) in valid_ids
     }
-    if not selected:
+    minimum = math.ceil(len(ordered_ids) * MINIMUM_SUMMARY_WORD_RATIO)
+    if len(selected) < minimum:
         fallback = local_layers([page]).get(page["page"], {})
         selected.update(int(word_id) for word_id in fallback.get("essential", []))
+    if len(selected) < minimum:
+        for group in passages([page]):
+            for index in ranked_sentence_indices(group):
+                selected.update(
+                    int(word["id"])
+                    for page_number, word in group[index]
+                    if page_number == page["page"]
+                )
+                if len(selected) >= minimum:
+                    break
+            if len(selected) >= minimum:
+                break
     return [word_id for word_id in ordered_ids if word_id in selected]

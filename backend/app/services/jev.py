@@ -1,6 +1,8 @@
+import math
+
 import httpx
 
-from .sentence_focus import add_sentence, passages
+from .sentence_focus import MINIMUM_SUMMARY_WORD_RATIO, add_sentence, passages
 
 
 class JevFocusClient:
@@ -47,13 +49,22 @@ class JevFocusClient:
 
         for page in pages:
             page_number = page["page"]
-            if result[page_number]["essential"] or not candidates[page_number]:
-                continue
-            _, _, sentence = max(
+            page_word_ids = {int(word["id"]) for word in page["words"]}
+            minimum = max(1, math.ceil(len(page_word_ids) * MINIMUM_SUMMARY_WORD_RATIO))
+            selected = set(result[page_number]["essential"]) & page_word_ids
+            ranked = sorted(
                 candidates[page_number],
-                key=lambda candidate: (candidate[0], -candidate[1]),
+                key=lambda candidate: (-candidate[0], candidate[1]),
             )
-            add_sentence(result, sentence)
+            for _, _, sentence in ranked:
+                if len(selected) >= minimum:
+                    break
+                add_sentence(result, sentence)
+                selected.update(
+                    int(word["id"])
+                    for candidate_page, word in sentence
+                    if candidate_page == page_number
+                )
 
         for layers in result.values():
             layers["essential"] = list(dict.fromkeys(layers["essential"]))
