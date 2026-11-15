@@ -362,13 +362,12 @@ async def test_failed_remote_batch_falls_back_without_aborting_document(tmp_path
 async def test_sentence_provider_cannot_leave_a_reading_page_empty(tmp_path):
     scene = tmp_path / "scene" / "pages"
     scene.mkdir(parents=True)
-    words = [
-        {"id": index, "text": word}
-        for index, word in enumerate(
-            "A normal reading page must retain enough meaningful text to remain understandable "
-            "even when the remote sentence scorer selects nothing at all.".split()
-        )
-    ]
+    text = (
+        "The opening sentence introduces the topic. "
+        "The central claim explains why careful choices matter. "
+        "A final example supports the conclusion."
+    )
+    words = [{"id": index, "text": word} for index, word in enumerate(text.split())]
     (scene / "page-0020.json").write_text(
         json.dumps({"number": 20, "words": words}), encoding="utf-8"
     )
@@ -382,9 +381,13 @@ async def test_sentence_provider_cannot_leave_a_reading_page_empty(tmp_path):
     await analyzer.analyze(tmp_path / "scene", tmp_path / "focus")
 
     result = json.loads((tmp_path / "focus" / "page-0020.json").read_text())
-    selected = len(result["focusWordIds"]) + len(result["contextWordIds"])
-    assert len(result["focusWordIds"]) >= round(len(words) * 0.24)
-    assert selected >= round(len(words) * 0.44)
+    sentence_ids = [
+        set(range(0, 6)),
+        set(range(6, 14)),
+        set(range(14, 20)),
+    ]
+    assert set(result["focusWordIds"]) in sentence_ids
+    assert result["contextWordIds"] == []
 
 
 @pytest.mark.asyncio
