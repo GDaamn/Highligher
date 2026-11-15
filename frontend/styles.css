@@ -334,3 +334,15 @@ body:has(#reader-view:not([hidden])) .reader-view { height: 100vh; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.upload-view:has(#pdf-preview:not([hidden])) { display: block; max-width: none; padding: 0; }
+#pdf-preview:not([hidden]) ~ .intro-copy,
+#pdf-preview:not([hidden]) ~ .upload-panel,
+body:has(#pdf-preview:not([hidden])) .library-dock { display: none; }
+#pdf-preview { height: calc(100dvh - var(--topbar-height)); display: flex; flex-direction: column; }
+.preview-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; padding: 12px var(--topbar-padding); background: var(--paper); border-bottom: 1px solid var(--line); }
+#preview-title { overflow-wrap: anywhere; }
+#preview-status { flex: 1; color: var(--muted); font-size: 14px; }
+.preview-toolbar a { color: var(--ink); font-size: 14px; }
+#open-highlights { padding: 7px 12px; background: var(--screen-ink); border: 1px solid var(--ink); border-radius: 4px; }
+#preview-pages { flex: 1; width: 100%; min-height: 0; }
