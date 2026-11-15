@@ -71,14 +71,17 @@ class JobManager:
                         message = f"Optimizing page preview {current} of {total}"
                     self.store.update(document_id, progress=value, message=message)
 
+                source = self.store.source_path(document_id)
+                pdf_options = (
+                    {"render_source": True, "mode": "auto", "source_progress": source_progress}
+                    if source.suffix.lower() == ".pdf" else {}
+                )
                 manifest = await asyncio.to_thread(
                     convert_document,
-                    self.store.source_path(document_id),
+                    source,
                     self.store.scene_dir(document_id),
-                    render_source=True,
-                    mode="auto",
                     progress=conversion_progress,
-                    source_progress=source_progress,
+                    **pdf_options,
                 )
             self.store.update(
                 document_id,
