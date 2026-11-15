@@ -26,6 +26,7 @@ from .services.metadata import extract_book_metadata
 from .services.focus_rules import PRESERVED_PAGE_KINDS
 from .services.jev import JevFocusClient
 from .services.focus import FOCUS_STRATEGY_VERSION, FocusAnalyzer
+from .services.sentence_focus import page_summary_word_ids
 from .services.structure import STRUCTURE_VERSION, build_structure
 from .libraries import Libraries
 from .store import DocumentStore
@@ -290,7 +291,8 @@ async def openrouter_page(jobs: Library, document_id: str, page_number: int, req
                 raise HTTPException(502, "OpenRouter could not return sentence scores.") from None
             finally:
                 await client.close()
-            selected = sorted(set(layers[page_number]["essential"]) | set(page["checkpointWordIds"]))
+            summary_ids = page_summary_word_ids(page, layers.get(page_number))
+            selected = sorted(set(summary_ids) | set(page["checkpointWordIds"]))
             jev_page_ids[cache_key] = selected
             if len(jev_page_ids) > JEV_CACHE_PAGES:
                 jev_page_ids.popitem(last=False)

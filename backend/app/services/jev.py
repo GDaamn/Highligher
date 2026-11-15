@@ -15,6 +15,8 @@ class JevFocusClient:
 
     async def select(self, pages):
         result = {p["page"]: {"essential": [], "context": []} for p in pages}
+        candidates = {p["page"]: [] for p in pages}
+        sentence_order = 0
         for group in passages(pages):
             sentences = {f"s{i}": " ".join(w["text"] for _, w in sentence)
                          for i, sentence in enumerate(group)}
@@ -36,6 +38,23 @@ class JevFocusClient:
                 score = answers[key]["noul"]
                 if type(score) not in (float, int) or not 0 <= score <= 1:
                     raise ValueError("Invalid Jev relevance score")
+                sentence = group[i]
+                for page_number in {page_number for page_number, _ in sentence}:
+                    candidates[page_number].append((score, sentence_order, sentence))
                 if score >= .65:
-                    add_sentence(result, group[i])
+                    add_sentence(result, sentence)
+                sentence_order += 1
+
+        for page in pages:
+            page_number = page["page"]
+            if result[page_number]["essential"] or not candidates[page_number]:
+                continue
+            _, _, sentence = max(
+                candidates[page_number],
+                key=lambda candidate: (candidate[0], -candidate[1]),
+            )
+            add_sentence(result, sentence)
+
+        for layers in result.values():
+            layers["essential"] = list(dict.fromkeys(layers["essential"]))
         return result
