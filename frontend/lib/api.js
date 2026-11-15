@@ -1,13 +1,20 @@
+import { listDeviceBooks, removeDeviceBook } from "./device-library.js";
+
 export class HighlighterApi {
   async health() {
-    return this.#json(fetch("/api/health"));
+    return this.#json(fetch("/api/health", { signal: AbortSignal.timeout(5000) }));
   }
 
   async library() {
-    return this.#json(fetch("/api/library"));
+    const [local, hosted] = await Promise.allSettled([
+      listDeviceBooks(), this.#json(fetch("/api/library", { signal: AbortSignal.timeout(5000) })),
+    ]);
+    if (local.status === "rejected" && hosted.status === "rejected") throw hosted.reason;
+    return [...(local.value || []), ...(hosted.value || [])];
   }
 
   async remove(documentId) {
+    if (documentId.startsWith("device-")) return removeDeviceBook(documentId);
     const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}`, { method: "DELETE" });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -84,3 +84,7 @@ class DocumentStructure(BaseModel):
     version: int = 1
     chapters: list[ChapterLink] = Field(default_factory=list)
     page_roles: dict[str, str] = Field(default_factory=dict)
+
+
+class DeviceFocusRequest(BaseModel):
+    words: list[Annotated[str, Field(min_length=1, max_length=512)]] = Field(min_length=1, max_length=4096)

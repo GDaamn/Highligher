@@ -19,7 +19,7 @@ from replica import UnsupportedDocumentError, detect_document_format, supported_
 from .config import Settings
 from .jobs import JobManager
 from .models import (
-    DocumentRecord, DocumentStructure, FocusAvailability, HealthResponse, PageDimRequest,
+    DeviceFocusRequest, DocumentRecord, DocumentStructure, FocusAvailability, HealthResponse, PageDimRequest,
     PagePreferences, ReadingStateRequest, UploadResponse, WordFocusRequest,
 )
 from .services.metadata import extract_book_metadata
@@ -65,6 +65,21 @@ async def health() -> HealthResponse:
         openrouter_configured=bool(settings.openrouter_api_key),
         supported_extensions=sorted(supported_extensions()),
     )
+
+
+@app.post("/api/device-focus")
+async def device_focus(payload: DeviceFocusRequest, jobs: Library):
+    if not settings.openrouter_api_key:
+        raise HTTPException(503, "OpenRouter is not configured.")
+    client = JevFocusClient(settings.openrouter_api_key, settings.jev_model)
+    words = [{"id": i, "text": text} for i, text in enumerate(payload.words)]
+    try:
+        result = await client.select([{"page": 1, "words": words}])
+        return {"focusWordIds": result[1]["essential"]}
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        raise HTTPException(502, "OpenRouter could not score this page.") from None
+    finally:
+        await client.close()
 
 
 @app.get("/api/library", response_model=list[DocumentRecord])

@@ -80,13 +80,16 @@ export class LibraryDock {
       const fallback = document.createElement("span");
       fallback.className = "library-cover-fallback";
       fallback.textContent = title.split(/\s+/).slice(0, 2).map(word => word[0]).join("").toUpperCase();
-      const cover = document.createElement("img");
-      cover.alt = "";
-      cover.loading = "lazy";
-      cover.draggable = false;
-      cover.src = `/documents/${documentRecord.id}/scene/source-pages/page-0001.webp`;
-      cover.addEventListener("error", () => cover.remove(), { once: true });
-      button.append(fallback, cover);
+      button.append(fallback);
+      if (documentRecord.thumbnail || !documentRecord.device) {
+        const cover = document.createElement("img");
+        cover.alt = "";
+        cover.loading = "lazy";
+        cover.draggable = false;
+        cover.src = documentRecord.thumbnail || `/documents/${documentRecord.id}/scene/source-pages/page-0001.webp`;
+        cover.addEventListener("error", () => cover.remove(), { once: true });
+        button.append(cover);
+      }
       button.addEventListener("click", () => {
         if (this.suppressClick) return;
         this.collapseAfterSelection(button);
