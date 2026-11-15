@@ -91,6 +91,7 @@ const uploader = new UploadController({
   input: pdfInput,
   dropZone: document.querySelector("#drop-zone"),
   processingCard,
+  preview: document.querySelector("#pdf-preview"),
   onReady: async documentRecord => {
     await library.refresh();
     await openReader(documentRecord);
