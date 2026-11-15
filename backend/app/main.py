@@ -8,9 +8,10 @@ import uuid
 from collections import OrderedDict
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from replica import UnsupportedDocumentError, detect_document_format, supported_extensions, supports_filename
@@ -26,35 +27,31 @@ from .services.focus_rules import PRESERVED_PAGE_KINDS
 from .services.jev import JevFocusClient
 from .services.focus import FOCUS_STRATEGY_VERSION, FocusAnalyzer
 from .services.structure import STRUCTURE_VERSION, build_structure
+from .libraries import Libraries
 from .store import DocumentStore
 
 
 settings = Settings.from_environment()
 settings.data_dir.mkdir(parents=True, exist_ok=True)
-store = DocumentStore(settings.data_dir)
-jobs = JobManager(settings, store)
+libraries = Libraries(settings)
+Library = Annotated[JobManager, Depends(libraries.for_request)]
 # Cache only model selections. Apply reading preferences separately on every response.
 jev_page_ids = OrderedDict()
 JEV_CACHE_PAGES = 512
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    jobs.resume_incomplete()
+    libraries.resume()
     yield
 
 
 app = FastAPI(title="Highlighter Document API", version="0.1.0", lifespan=lifespan)
 
 
-@app.middleware("http")
-async def prevent_stale_app_assets(request: Request, call_next):
-    response = await call_next(request)
-    if not request.url.path.startswith(("/api/", "/documents/")):
-        response.headers["Cache-Control"] = "no-store"
-    return response
+app.middleware("http")(libraries.session)
 
 
-async def _document_or_404(document_id: str) -> DocumentRecord:
+async def _document_or_404(store: DocumentStore, document_id: str) -> DocumentRecord:
     try:
         return await asyncio.to_thread(store.get, document_id)
     except FileNotFoundError as error:
@@ -71,12 +68,14 @@ async def health() -> HealthResponse:
 
 
 @app.get("/api/library", response_model=list[DocumentRecord])
-async def document_library() -> list[DocumentRecord]:
+async def document_library(jobs: Library) -> list[DocumentRecord]:
+    store = jobs.store
     return await asyncio.to_thread(store.list_ready)
 
 
 @app.post("/api/documents", response_model=UploadResponse, status_code=status.HTTP_202_ACCEPTED)
-async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
+async def upload_document(jobs: Library, file: UploadFile = File(...)) -> UploadResponse:
+    store = jobs.store
     file_name = Path(file.filename or "document").name
     if not supports_filename(file_name):
         formats = ", ".join(sorted(supported_extensions()))
@@ -151,7 +150,8 @@ async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
 
 
 @app.get("/api/documents/lookup", response_model=UploadResponse)
-async def lookup_document(sha256: str, size: int | None = None) -> UploadResponse:
+async def lookup_document(jobs: Library, sha256: str, size: int | None = None) -> UploadResponse:
+    store = jobs.store
     if len(sha256) != 64 or any(character not in "0123456789abcdefABCDEF" for character in sha256):
         raise HTTPException(status_code=400, detail="Invalid document fingerprint.")
     cached = await asyncio.to_thread(
@@ -168,20 +168,23 @@ async def lookup_document(sha256: str, size: int | None = None) -> UploadRespons
 
 
 @app.get("/api/documents/{document_id}", response_model=DocumentRecord)
-async def document_status(document_id: str) -> DocumentRecord:
-    return await _document_or_404(document_id)
+async def document_status(jobs: Library, document_id: str) -> DocumentRecord:
+    store = jobs.store
+    return await _document_or_404(store, document_id)
 
 
 @app.delete("/api/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_document(document_id: str) -> Response:
-    await _document_or_404(document_id)
+async def delete_document(jobs: Library, document_id: str) -> Response:
+    store = jobs.store
+    await _document_or_404(store, document_id)
     await jobs.cancel(document_id)
     await asyncio.to_thread(store.delete, document_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.get("/api/documents/{document_id}/preferences", response_model=PagePreferences)
-async def document_preferences(document_id: str) -> PagePreferences:
+async def document_preferences(jobs: Library, document_id: str) -> PagePreferences:
+    store = jobs.store
     try:
         return await asyncio.to_thread(store.get_preferences, document_id)
     except FileNotFoundError as error:
@@ -189,23 +192,26 @@ async def document_preferences(document_id: str) -> PagePreferences:
 
 
 @app.put("/api/documents/{document_id}/preferences/pages/{page_number}", response_model=PagePreferences)
-async def set_page_dimmed(document_id: str, page_number: int, request: PageDimRequest) -> PagePreferences:
-    document = await _document_or_404(document_id)
+async def set_page_dimmed(jobs: Library, document_id: str, page_number: int, request: PageDimRequest) -> PagePreferences:
+    store = jobs.store
+    document = await _document_or_404(store, document_id)
     if page_number < 1 or (document.page_count is not None and page_number > document.page_count):
         raise HTTPException(status_code=400, detail="Page number is outside this document.")
     return await asyncio.to_thread(store.set_page_dimmed, document_id, page_number, request.dimmed)
 
 
 @app.put("/api/documents/{document_id}/preferences/reading", response_model=PagePreferences)
-async def set_reading_state(document_id: str, request: ReadingStateRequest) -> PagePreferences:
-    document = await _document_or_404(document_id)
+async def set_reading_state(jobs: Library, document_id: str, request: ReadingStateRequest) -> PagePreferences:
+    store = jobs.store
+    document = await _document_or_404(store, document_id)
     if document.page_count and request.page > document.page_count:
         raise HTTPException(status_code=400, detail="Page number is outside this document.")
     return await asyncio.to_thread(store.set_reading_state, document_id, request.page, request.mode)
 
 
 @app.put("/api/documents/{document_id}/focus/{page_number}/words/{word_id}")
-async def set_word_focus(document_id: str, page_number: int, word_id: int, request: WordFocusRequest) -> JSONResponse:
+async def set_word_focus(jobs: Library, document_id: str, page_number: int, word_id: int, request: WordFocusRequest) -> JSONResponse:
+    store = jobs.store
     scene_path = store.scene_dir(document_id) / "pages" / f"page-{page_number:04d}.json"
     if not scene_path.is_file():
         raise HTTPException(status_code=404, detail="Page not found.")
@@ -214,12 +220,13 @@ async def set_word_focus(document_id: str, page_number: int, word_id: int, reque
     if word is None:
         raise HTTPException(status_code=404, detail="Word not found.")
     await asyncio.to_thread(store.set_word_focus, document_id, page_number, word_id, str(word.get("text", "")), request.focused)
-    return JSONResponse(await asyncio.to_thread(_focus_payload, document_id, page_number))
+    return JSONResponse(await asyncio.to_thread(_focus_payload, store, document_id, page_number))
 
 
 @app.get("/api/documents/{document_id}/structure", response_model=DocumentStructure)
-async def document_structure(document_id: str) -> DocumentStructure:
-    await _document_or_404(document_id)
+async def document_structure(jobs: Library, document_id: str) -> DocumentStructure:
+    store = jobs.store
+    await _document_or_404(store, document_id)
     path = store.structure_path(document_id)
     if path.is_file():
         cached = DocumentStructure.model_validate_json(path.read_text(encoding="utf-8"))
@@ -231,16 +238,18 @@ async def document_structure(document_id: str) -> DocumentStructure:
 
 
 @app.get("/api/documents/{document_id}/focus/{page_number}")
-async def page_focus(document_id: str, page_number: int) -> JSONResponse:
+async def page_focus(jobs: Library, document_id: str, page_number: int) -> JSONResponse:
+    store = jobs.store
     path = store.focus_dir(document_id) / f"page-{page_number:04d}.json"
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Focus data is not ready for this page.")
-    return JSONResponse(await asyncio.to_thread(_focus_payload, document_id, page_number))
+    return JSONResponse(await asyncio.to_thread(_focus_payload, store, document_id, page_number))
 
 
 @app.post("/api/documents/{document_id}/focus/{page_number}/openrouter")
-async def openrouter_page(document_id: str, page_number: int, request: Request):
-    document = await _document_or_404(document_id)
+async def openrouter_page(jobs: Library, document_id: str, page_number: int, request: Request):
+    store = jobs.store
+    document = await _document_or_404(store, document_id)
     scheme, _, token = request.headers.get("authorization", "").partition(" ")
     if scheme.lower() != "bearer" or not token or not token.isascii() or any(ord(c) <= 32 or ord(c) >= 127 for c in token):
         raise HTTPException(400, "Enter an OpenRouter API key.")
@@ -273,12 +282,13 @@ async def openrouter_page(document_id: str, page_number: int, request: Request):
         else:
             jev_page_ids.move_to_end(cache_key)
         payload.update(focusWordIds=selected, contextWordIds=[], provider="jev", model=settings.jev_model)
-    return JSONResponse(await asyncio.to_thread(_focus_payload, document_id, page_number, payload), headers={"Cache-Control": "no-store"})
+    return JSONResponse(await asyncio.to_thread(_focus_payload, store, document_id, page_number, payload), headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/documents/{document_id}/focus-ready", response_model=FocusAvailability)
-async def focus_availability(document_id: str) -> FocusAvailability:
-    document = await _document_or_404(document_id)
+async def focus_availability(jobs: Library, document_id: str) -> FocusAvailability:
+    store = jobs.store
+    document = await _document_or_404(store, document_id)
     pages = sorted(
         int(path.stem.removeprefix("page-"))
         for path in store.focus_dir(document_id).glob("page-*.json")
@@ -286,7 +296,7 @@ async def focus_availability(document_id: str) -> FocusAvailability:
     return FocusAvailability(pages=pages, complete=document.state == "ready")
 
 
-def _focus_payload(document_id: str, page_number: int, payload: dict | None = None) -> dict:
+def _focus_payload(store: DocumentStore, document_id: str, page_number: int, payload: dict | None = None) -> dict:
     focus_path = store.focus_dir(document_id) / f"page-{page_number:04d}.json"
     if payload is None:
         payload = json.loads(focus_path.read_text(encoding="utf-8"))
@@ -316,6 +326,10 @@ def _focus_payload(document_id: str, page_number: int, payload: dict | None = No
     return payload
 
 
-app.mount("/documents", StaticFiles(directory=store.documents_dir, check_dir=False), name="documents")
+@app.api_route("/documents/{asset:path}", methods=["GET", "HEAD"], include_in_schema=False)
+async def document_asset(asset: str, request: Request, jobs: Library):
+    files = StaticFiles(directory=jobs.store.documents_dir)
+    return await files.get_response(asset, request.scope)
+
 app.mount("/engine", StaticFiles(directory=settings.engine_dir), name="engine")
 app.mount("/", StaticFiles(directory=settings.frontend_dir, html=True), name="frontend")

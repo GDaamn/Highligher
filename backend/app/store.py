@@ -18,6 +18,8 @@ class DocumentStore:
         self._lock = RLock()
 
     def directory(self, document_id: str) -> Path:
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", document_id):
+            raise FileNotFoundError(document_id)
         return self.documents_dir / document_id
 
     def source_path(self, document_id: str, file_name: str | None = None) -> Path:
