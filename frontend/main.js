@@ -26,6 +26,7 @@ function showUploadView() {
   processingCard.hidden = true;
   pdfInput.value = "";
   library.setActive(null);
+  library.refresh();
 }
 
 function notify(message) {
@@ -40,7 +41,7 @@ globalThis.addEventListener("highlighter:error", event => {
 });
 globalThis.addEventListener("highlighter:notice", event => notify(event.detail));
 
-async function openReader(documentRecord) {
+async function openReader(documentRecord, pdf = null) {
   if (openingDocument) return;
   openingDocument = true;
   const isLeavingHome = !uploadView.hidden;
@@ -54,8 +55,9 @@ async function openReader(documentRecord) {
   readerView.hidden = false;
   readerView.classList.add("is-entering");
   document.body.classList.add("reading");
-  reader = new ReaderController({ api, document: documentRecord, root: readerView });
   try {
+    const device = documentRecord.device ? await import("./features/device-pdf.js") : null;
+    reader = new ReaderController({ api, document: documentRecord, root: readerView, device, pdf });
     await reader.start();
     library.setActive(documentRecord.id);
     requestAnimationFrame(() => readerView.classList.remove("is-entering"));
@@ -91,10 +93,9 @@ const uploader = new UploadController({
   input: pdfInput,
   dropZone: document.querySelector("#drop-zone"),
   processingCard,
-  preview: document.querySelector("#pdf-preview"),
-  onReady: async documentRecord => {
-    await library.refresh();
-    await openReader(documentRecord);
+  onReady: async (documentRecord, pdf) => {
+    library.refresh();
+    await openReader(documentRecord, pdf);
   },
   onError: error => notify(error.message),
 });

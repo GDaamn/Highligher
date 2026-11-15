@@ -1,17 +1,12 @@
 import { bookByline, metadataFromFilename } from "../lib/book-metadata.js";
 
 export class UploadController {
-  constructor({ api, form, input, dropZone, processingCard, preview, onReady, onError }) {
+  constructor({ api, form, input, dropZone, processingCard, onReady, onError }) {
     this.api = api;
     this.form = form;
     this.input = input;
     this.dropZone = dropZone;
     this.processingCard = processingCard;
-    this.preview = preview;
-    this.previewPages = preview.querySelector("#preview-pages");
-    this.previewLink = preview.querySelector("#preview-link");
-    this.previewStatus = preview.querySelector("#preview-status");
-    this.openHighlights = preview.querySelector("#open-highlights");
     this.onReady = onReady;
     this.onError = onError;
     this.fileName = processingCard.querySelector("#processing-file");
@@ -109,25 +104,6 @@ export class UploadController {
     return fallbackFiles.find(candidate => this.accepts(candidate)) || null;
   }
 
-  showPdf(file) {
-    // An explicit PDF type also handles files whose OS supplies no MIME type.
-    this.previewUrl = URL.createObjectURL(file.slice(0, file.size, "application/pdf"));
-    this.previewLink.href = this.previewUrl;
-    this.previewPages.data = this.previewUrl;
-    this.preview.querySelector("#preview-title").textContent = this.inferredMetadata.title;
-    this.preview.hidden = false;
-  }
-
-  closePdf() {
-    this.preview.hidden = true;
-    this.openHighlights.hidden = true;
-    this.openHighlights.onclick = null;
-    this.previewPages.removeAttribute("data");
-    this.previewLink.removeAttribute("href");
-    if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
-    this.previewUrl = null;
-  }
-
   async process(file) {
     if (this.processing) return;
     if (!this.accepts(file)) {
@@ -148,7 +124,13 @@ export class UploadController {
     this.fileName.textContent = this.inferredMetadata.title;
     this.bookMeta.textContent = bookByline(this.inferredMetadata);
     try {
-      if (file.name.toLowerCase().endsWith(".pdf")) this.showPdf(file);
+      if (file.name.toLowerCase().endsWith(".pdf")) {
+        this.update({ state: "converting", message: "Opening PDF on this device", progress: .1 });
+        const { importPdf } = await import("./device-pdf.js");
+        const { record, pdf } = await importPdf(file);
+        await this.onReady(record, pdf);
+        return;
+      }
       this.update({ state: "queued", message: "Receiving document", progress: .02 });
       const uploadFile = await this.prepareUpload(file);
       const upload = await this.api.upload(uploadFile, ratio => this.update({
@@ -159,27 +141,14 @@ export class UploadController {
         progress: ratio * .08,
       }));
       const result = await this.api.waitUntilReadable(upload.document.id, document => this.update(document));
-      if (this.previewUrl) {
-        this.previewStatus.textContent = "Highlights ready";
-        this.openHighlights.hidden = false;
-        this.openHighlights.onclick = () => {
-          this.closePdf();
-          this.onReady(result);
-        };
-      } else {
-        await this.finish();
-        await this.onReady(result);
-      }
+      await this.finish();
+      await this.onReady(result);
     } catch (error) {
       this.form.hidden = false;
       this.processingCard.hidden = true;
       this.processingCard.dataset.phase = "";
       this.input.value = "";
-      if (this.previewUrl) {
-        this.previewStatus.textContent = `Highlights unavailable. ${error.message}`;
-      } else {
-        this.onError(error);
-      }
+      this.onError(error);
     } finally {
       this.processing = false;
     }
@@ -205,10 +174,6 @@ export class UploadController {
   update(document) {
     const progress = Math.max(0, Math.min(1, document.progress || 0));
     const phase = this.phaseFor(document.state);
-    if (this.previewUrl) {
-      this.previewStatus.textContent = document.message || "Preparing highlights…";
-      return;
-    }
     this.setPhase(phase);
     this.message.textContent = document.message || "Working on your document";
     this.animatePercent(Math.round(progress * 100));

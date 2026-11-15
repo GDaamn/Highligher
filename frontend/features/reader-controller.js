@@ -4,7 +4,7 @@ import { CoverLayer } from "./cover-layer.js";
 import { bookByline, metadataForRecord } from "../lib/book-metadata.js";
 
 export class ReaderController {
-  constructor({ api, document: documentRecord, root }) {
+  constructor({ api, document: documentRecord, root, device, pdf }) {
     this.api = api;
     this.document = documentRecord;
     this.root = root;
@@ -14,14 +14,16 @@ export class ReaderController {
       "view-one", "view-two", "chapter-menu", "chapter-trigger", "chapter-label", "chapter-options",
     ].map(id => [id, root.querySelector(`#${id}`)]));
     this.stage = root.querySelector("#reader-stage");
-    this.engine = new PdfReplicaEngine({
+    const Engine = device?.DevicePdfEngine || PdfReplicaEngine;
+    this.engine = new Engine({
       root: root.querySelector("#engine-root"),
       baseUrl: `/documents/${documentRecord.id}/scene`,
       initialZoom: 1,
       continuous: true,
       scrollRoot: this.stage,
       editable: false,
-    });
+    }, documentRecord, pdf);
+    if (device) this.api = new device.DeviceReaderApi(this.engine, api);
     this.resizeListener = () => this.fitCurrentView();
     this.readingMode = "focus";
     this.saveTimer = null;
@@ -44,16 +46,19 @@ export class ReaderController {
     this.engine.addEventListener("zoomchange", event => {
       this.controls["zoom-value"].textContent = `${Math.round(event.detail.zoom * 100)}%`;
     });
-    const [preferences, structure] = await Promise.all([
+    const [preferences] = await Promise.all([
       this.api.preferences(this.document.id),
-      this.api.structure(this.document.id),
       this.engine.load(),
     ]);
     this.engine.setSourceVisible(false);
     this.cover = new CoverLayer({ engine: this.engine, document: this.document });
     this.cover.apply();
     this.setViewMode("spread");
-    this.setChapters(structure.chapters || []);
+    this.setChapters([]);
+    const structure = this.api.structure(this.document.id);
+    structure.then(result => {
+      if (!this.destroyed) this.setChapters(result.chapters || []);
+    }).catch(error => console.warn("Chapter list unavailable", error));
     await this.engine.goToPage(preferences.last_page || 1);
     this.focus = new FocusLayer({
       engine: this.engine,
@@ -164,6 +169,7 @@ export class ReaderController {
   }
 
   destroy() {
+    this.destroyed = true;
     clearTimeout(this.saveTimer);
     this.api.setReadingState(this.document.id, this.engine.pageNumber, this.readingMode).catch(() => {});
     globalThis.removeEventListener("resize", this.resizeListener);
