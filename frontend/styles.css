@@ -336,3 +336,9 @@ body:has(#reader-view:not([hidden])) .reader-view { height: 100vh; }
 }
 
 .replica-page.device-pdf-page.replica-source-visible .replica-content-layer { opacity: 0; }
+
+.sample-book { display: grid; gap: 4px; width: 100%; margin-top: 16px; text-decoration: none; padding: 12px 14px; text-align: left; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
+.sample-book:hover, .sample-book:focus-visible { border-color: var(--ink); }
+.sample-book span { color: var(--muted); font-size: 12px; }
+.sample-book strong { font-size: 16px; }
+.sample-book .sample-action { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
