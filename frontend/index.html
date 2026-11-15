@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Highlighter — read with focus</title>
+    <link rel="stylesheet" href="/engine/replica-engine.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Highlighter home">
+        <span class="brand-glyph" aria-hidden="true">HL</span>
+        <span>highlighter</span>
+      </a>
+      <button type="button" class="key-settings">OpenRouter</button>
+    </header>
+
+    <main>
+      <section id="upload-view" class="upload-view">
+        <div class="intro-copy">
+          <p class="eyebrow">HL–01 / DOCUMENT INSTRUMENT</p>
+          <h1>read less.<br />understand more.</h1>
+        </div>
+
+        <div class="upload-panel">
+          <form id="upload-form">
+            <label id="drop-zone" class="drop-zone" for="pdf-file">
+              <input id="pdf-file" name="file" type="file" accept="application/pdf,application/epub+zip,.pdf,.epub" hidden />
+              <span class="document-intake" aria-hidden="true">
+                <span class="intake-label"><b>DOCUMENT INTAKE</b><i></i><em>STANDBY</em></span>
+                <span class="intake-housing">
+                  <span class="intake-door intake-door-top"></span>
+                  <span class="intake-throat"></span>
+                  <span class="intake-door intake-door-bottom"></span>
+                </span>
+                <span class="intake-scale"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </span>
+              <strong>LOAD DOCUMENT</strong>
+              <span data-supported-formats>drop PDF or EPUB, or press to browse</span>
+              <small>max 100 MB</small>
+            </label>
+          </form>
+
+          <section id="processing-card" class="processing-card" hidden aria-live="polite">
+            <div class="file-row">
+              <span class="pdf-badge">PDF</span>
+              <div>
+                <strong id="processing-file">Document</strong>
+                <span id="processing-book-meta" class="processing-book-meta"></span>
+              </div>
+              <output id="processing-percent">0%</output>
+            </div>
+            <div class="processing-workbench" aria-hidden="true">
+              <div class="receive-visual"><span></span><i></i><span></span></div>
+              <div class="page-stack">
+                <span>001</span><span>002</span><span>003</span><span>004</span><span>005</span>
+              </div>
+            </div>
+            <ol class="processing-stages" aria-label="Processing stages">
+              <li data-phase="receive"><i></i><span>01 RECEIVE</span></li>
+              <li data-phase="assemble"><i></i><span>02 ASSEMBLE</span></li>
+              <li data-phase="focus"><i></i><span>03 FOCUS</span></li>
+            </ol>
+            <div class="progress-track"><span id="processing-progress"></span></div>
+            <p id="processing-message">Preparing your document…</p>
+          </section>
+
+          <p id="configuration-warning" class="configuration-warning" hidden></p>
+        </div>
+
+      </section>
+
+      <section id="reader-view" class="reader-view" hidden>
+        <header class="reader-toolbar">
+          <div class="document-identity">
+            <a class="brand reader-brand" href="/" aria-label="Highlighter home">
+              <span class="brand-glyph" aria-hidden="true">HL</span>
+              <span>highlighter</span>
+            </a>
+            <span class="identity-divider" aria-hidden="true"></span>
+            <button id="new-document" class="icon-button" title="Upload another document" aria-label="Upload another document">←</button>
+            <div><strong id="document-title">Document</strong><span id="document-stats">Preparing pages</span></div>
+          </div>
+          <nav class="reader-controls" aria-label="Reader controls">
+            <button type="button" class="key-settings">OpenRouter</button>
+            <label class="page-position"><span>Page</span><input id="page-number" type="number" min="1" value="1" /><output id="page-count">/ 1</output></label>
+            <div id="chapter-menu" class="chapter-menu" hidden>
+              <button id="chapter-trigger" class="chapter-trigger" type="button" aria-expanded="false" aria-controls="chapter-options">
+                <span id="chapter-label">Chapters</span><i aria-hidden="true"></i>
+              </button>
+              <div id="chapter-options" class="chapter-options" role="listbox" aria-label="Jump to chapter" hidden></div>
+            </div>
+            <fieldset class="segmented-selector reading-mode-selector" aria-label="Reading mode">
+              <label><input id="mode-focus" name="reading-mode" type="radio" checked /><span>Focus</span></label>
+              <label><input id="mode-original" name="reading-mode" type="radio" /><span>Original</span></label>
+            </fieldset>
+            <fieldset class="segmented-selector view-selector" aria-label="Page layout">
+              <label><input id="view-one" name="page-layout" type="radio" /><span>1</span></label>
+              <label><input id="view-two" name="page-layout" type="radio" checked /><span>2</span></label>
+            </fieldset>
+            <span class="control-divider"></span>
+            <button id="zoom-out" class="icon-button" aria-label="Zoom out">−</button>
+            <output id="zoom-value">125%</output>
+            <button id="zoom-in" class="icon-button" aria-label="Zoom in">+</button>
+          </nav>
+        </header>
+
+        <div class="reader-layout">
+          <section id="reader-stage" class="reader-stage" aria-live="polite">
+            <div id="engine-root"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <aside id="library-dock" class="library-dock" aria-label="Book library" hidden>
+      <button class="library-handle" type="button" aria-label="Open book library"></button>
+      <div class="library-surface">
+        <div id="library-caption" class="library-caption" aria-live="polite"></div>
+        <div id="library-track" class="library-track" role="list"></div>
+      </div>
+    </aside>
+
+    <dialog id="key-dialog" aria-labelledby="key-heading">
+      <form id="key-form">
+        <h2 id="key-heading">Sentence highlighting</h2>
+        <label for="router-key">OpenRouter API key</label>
+        <input id="router-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…" />
+        <p>Use Jev to score pages as you read. Passages go to OpenRouter. Your key stays in memory for this tab.</p>
+        <p id="key-status" role="status"></p>
+        <div><button type="submit">Use Jev</button> <button type="button" id="forget-key">Clear key</button> <button type="button" id="close-key">Close</button></div>
+      </form>
+    </dialog>
+    <div id="toast" class="toast" role="status"></div>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

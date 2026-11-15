@@ -1,0 +1,27 @@
+.replica-engine-shell { transform-origin: top center; transition: width .15s, height .15s; }
+.replica-page-stream { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); gap: 38px; justify-items: center; align-items: start; }
+.replica-page-stream.replica-spread { grid-template-columns: repeat(2, max-content); gap: 34px 22px; justify-content: center; }
+.replica-page-slot { display: grid; place-items: start center; scroll-margin-top: 22px; }
+.replica-page-placeholder { width: 100%; height: 100%; display: grid; place-items: center; border: 1px solid rgba(0,0,0,.12); background: var(--replica-paper, #fff); color: rgba(0,0,0,.22); font: 11px ui-monospace, monospace; letter-spacing: .14em; box-shadow: 0 12px 38px rgba(36, 32, 25, .13); }
+.replica-page { position: relative; background: var(--replica-paper, #fff); box-shadow: 0 12px 38px rgba(36, 32, 25, .19); overflow: hidden; transform-origin: top left; }
+.replica-source-page { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: 0; pointer-events: none; }
+.replica-source-visible .replica-source-page { opacity: 1; }
+.replica-page:not(.replica-scan-page).replica-source-visible .replica-content-layer { opacity: .06; }
+.replica-content-layer { position: absolute; inset: 0; z-index: 1; }
+.replica-page-image { position: absolute; object-fit: fill; user-select: none; }
+.replica-scan-page .replica-embedded-source-page { opacity: 0; pointer-events: none; }
+.replica-scan-page.replica-source-visible .replica-embedded-source-page { opacity: 1; }
+.replica-rule-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.replica-scan-source-region { position: absolute; overflow: hidden; pointer-events: none; }
+.replica-scan-source-fragment { position: absolute; max-width: none; user-select: none; }
+.replica-word-box { position: absolute; white-space: nowrap; overflow: visible; transform-origin: left top; }
+.replica-scan-page .replica-word-box { overflow: hidden; }
+.replica-word-text { position: absolute; left: 0; top: 0; display: inline-block; white-space: nowrap; transform-origin: left top; outline: none; cursor: text; }
+.replica-word-text:hover { background: rgba(181, 76, 46, .10); box-shadow: 0 0 0 1px rgba(181, 76, 46, .25); }
+.replica-readonly .replica-word-text:hover { background: transparent; box-shadow: none; }
+.replica-word-text:focus { background: rgba(181, 76, 46, .12); box-shadow: 0 0 0 1px var(--replica-accent, #b54c2e); z-index: 3; }
+.replica-scan-page:not(.replica-source-visible) .replica-source-typography-word .replica-word-text:not(:focus):not(.modified) { color: transparent !important; }
+.replica-scan-page.replica-source-visible .replica-word-text:not(:focus):not(.modified) { color: transparent !important; }
+.replica-scan-page.replica-source-visible .replica-word-text:focus,
+.replica-scan-page.replica-source-visible .replica-word-text.modified { color: #161513 !important; background: rgba(255, 255, 255, .94); box-shadow: 0 0 0 1px rgba(181, 76, 46, .55); }
+.replica-page:not(.replica-exact-fit) .replica-word-text { transform: none !important; }

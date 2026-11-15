@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "id": "source",
+  "title": "Sorting and Searching Algorithms:",
+  "format": "pdf",
+  "pageCount": 36,
+  "fonts": {
+    "Helvetica-Bold": {
+      "family": "Helvetica-Bold",
+      "file": null,
+      "format": null
+    },
+    "Helvetica": {
+      "family": "Helvetica",
+      "file": null,
+      "format": null
+    },
+    "Times-Roman": {
+      "family": "Times-Roman",
+      "file": null,
+      "format": null
+    },
+    "Times-Italic": {
+      "family": "Times-Italic",
+      "file": null,
+      "format": null
+    },
+    "Times-Bold": {
+      "family": "Times-Bold",
+      "file": null,
+      "format": null
+    },
+    "Times-BoldItalic": {
+      "family": "Times-BoldItalic",
+      "file": null,
+      "format": null
+    },
+    "Courier-Bold": {
+      "family": "Courier-Bold",
+      "file": null,
+      "format": null
+    },
+    "GFAOFB+Century.Schoolbook091.688": {
+      "family": "GFAOFB+Century.Schoolbook091.688",
+      "file": "assets/fonts/Century.Schoolbook091.688.otf",
+      "format": "opentype"
+    },
+    "Symbol": {
+      "family": "Symbol",
+      "file": null,
+      "format": null
+    },
+    "GFBCDN+Century.Schoolbook.Italic083.313": {
+      "family": "GFBCDN+Century.Schoolbook.Italic083.313",
+      "file": "assets/fonts/Century.Schoolbook.Italic083.313.otf",
+      "format": "opentype"
+    },
+    "Courier": {
+      "family": "Courier",
+      "file": null,
+      "format": null
+    },
+    "MT.Extra099.875": {
+      "family": "MT.Extra099.875",
+      "file": "assets/fonts/MT.Extra099.875.otf",
+      "format": "opentype"
+    }
+  },
+  "mode": "digital",
+  "sourcePreview": false,
+  "editableWordCount": 10478,
+  "author": "Thomas Niemann"
+}

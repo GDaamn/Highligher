@@ -1,0 +1,47 @@
+{
+  "version": 3,
+  "chapters": [
+    {
+      "page": 4,
+      "label": "Introduction"
+    }
+  ],
+  "page_roles": {
+    "1": "front-matter",
+    "2": "reading",
+    "3": "contents",
+    "4": "reading",
+    "5": "reading",
+    "6": "reading",
+    "7": "reading",
+    "8": "reading",
+    "9": "reading",
+    "10": "reading",
+    "11": "reading",
+    "12": "reading",
+    "13": "reading",
+    "14": "reading",
+    "15": "reading",
+    "16": "reading",
+    "17": "reading",
+    "18": "reading",
+    "19": "reading",
+    "20": "reading",
+    "21": "reading",
+    "22": "reading",
+    "23": "reading",
+    "24": "contents",
+    "25": "reading",
+    "26": "reading",
+    "27": "reading",
+    "28": "reading",
+    "29": "reading",
+    "30": "reading",
+    "31": "reading",
+    "32": "reading",
+    "33": "reading",
+    "34": "reading",
+    "35": "reading",
+    "36": "reading"
+  }
+}

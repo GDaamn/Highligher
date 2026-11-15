@@ -1,0 +1,30 @@
+[project]
+name = "booklamp-app"
+version = "0.1.0"
+description = "Upload documents, reconstruct editable pages, and highlight AI-selected focus words."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.116,<1",
+  "httpx>=0.28,<1",
+  "pypdf>=5,<7",
+  "python-multipart>=0.0.20,<1",
+  "replica-document-engine",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "pytest-asyncio>=1,<2"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]
+
+[tool.uv.sources]
+replica-document-engine = { path = "vendor/RenderEngine", editable = true }
