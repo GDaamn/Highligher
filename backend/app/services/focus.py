@@ -17,7 +17,7 @@ from .focus_rules import (
 )
 
 
-FOCUS_STRATEGY_VERSION = 18
+FOCUS_STRATEGY_VERSION = 19
 INITIAL_FOCUS_RATIO = 0.3
 
 
@@ -95,7 +95,7 @@ class FocusAnalyzer:
 
             batch_focus = 0
             for page in pages:
-                essential_ids, context_ids = self._page_layers(page, selected, sentence_mode=used_provider != "deepseek")
+                essential_ids, context_ids = self._page_layers(page, selected)
                 record = {
                     "schemaVersion": 1,
                     "strategyVersion": FOCUS_STRATEGY_VERSION,
@@ -184,7 +184,6 @@ class FocusAnalyzer:
         self,
         page: dict[str, Any],
         selected: dict[int, dict[str, list[int]]],
-        sentence_mode: bool = False,
     ) -> tuple[list[int], list[int]]:
         if page["dimPage"]:
             return [], []
@@ -192,10 +191,7 @@ class FocusAnalyzer:
             return [int(word["id"]) for word in page["words"]], []
 
         proposed = selected.get(page["page"], {})
-        if sentence_mode:
-            essential_ids, context_ids = proposed.get("essential", []), []
-        else:
-            essential_ids, context_ids = self._validate_layers(page["words"], proposed)
+        essential_ids, context_ids = self._validate_layers(page["words"], proposed)
         checkpoints = set(page["checkpointWordIds"])
         essential = set(essential_ids) | checkpoints
         ordered_essential = [
