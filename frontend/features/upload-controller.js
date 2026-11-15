@@ -39,29 +39,12 @@ export class UploadController {
     this.formatLabel = label;
   }
 
-  pickerTypes() {
-    const accept = {};
-    if (this.extensions.includes(".pdf")) accept["application/pdf"] = [".pdf"];
-    if (this.extensions.includes(".epub")) accept["application/epub+zip"] = [".epub"];
-    return [{ description: this.formatLabel, accept }];
-  }
-
   accepts(file) {
     return this.supportedDocument.test(file.name);
   }
 
   bind() {
     this.input.addEventListener("change", () => this.input.files[0] && this.process(this.input.files[0]));
-    this.dropZone.addEventListener("click", async event => {
-      if (!window.showOpenFilePicker) return;
-      event.preventDefault();
-      try {
-        const [handle] = await window.showOpenFilePicker({ multiple: false, types: this.pickerTypes() });
-        this.process(await handle.getFile());
-      } catch (error) {
-        if (error?.name !== "AbortError") this.onError(error);
-      }
-    });
     this.dropZone.addEventListener("dragenter", event => {
       event.preventDefault();
       this.dragDepth += 1;
